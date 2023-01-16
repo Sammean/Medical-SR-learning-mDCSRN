@@ -1,0 +1,7 @@
+/data/
+/generated_plots/
+.idea
+/__pycache__/
+/tensor_checkpoints_d/
+/tensor_checkpoints_g/
+training.log
