@@ -1,7 +1,7 @@
 import numpy as np
+import tensorflow as tf
 
-
-def score_patch(pred_patch, true_patch, c, tf=None):
+def score_patch(pred_patch, true_patch, c):
     pred_patch = np.squeeze(pred_patch[0, :, :, :, :])
     true_patch = np.squeeze(true_patch[0, :, :, :, :])
     pred_cs = np.squeeze(pred_patch[c, :, :])
@@ -17,3 +17,8 @@ def score_patch(pred_patch, true_patch, c, tf=None):
     print('PSNR:{} '.format(psnr.numpy()))
     print('MSE:{} '.format(mse.numpy()))
     print('----------------------------------')
+
+if __name__ == '__main__':
+    x = tf.random.uniform([2, 64, 64, 64, 1])
+    y = tf.random.uniform([2, 64, 64, 64, 1])
+    score_patch(x, y, 32)
