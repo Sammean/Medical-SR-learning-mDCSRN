@@ -9,7 +9,8 @@ from sklearn.utils import shuffle
 
 from logger import log
 from loss_functions import supervised_loss, d_loss_fn
-from plotting import generate_images, plot_losses
+from utils import score_patch
+from plotting import generate_images, plot_losses_d, plot_losses_g
 from data_preparing import get_batch_data
 from model_checkpoints import get_generator, save_generator, get_discrimitor, save_discriminator
 
@@ -17,7 +18,8 @@ from model_checkpoints import get_generator, save_generator, get_discrimitor, sa
 def signal_handler(sig, frame):
     stop_log = "The training process was stopped at "+time.ctime()
     log(stop_log)
-    plot_losses(epochs_plot, total_generator_g_error_plot)
+    plot_losses_g(epochs_plot, total_generator_g_error_plot)
+    plot_losses_d(epochs_plot, total_discriminator_d_error_plot)
     save_generator(ckpt_manager_g, "final_epoch")
     save_discriminator(ckpt_manager_d, "final_epoch")
     sys.exit(0)
@@ -78,7 +80,7 @@ def training_loop(LR_G, LR_D, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EP
     generator_g, generator_optimizer, ckpt_manager_g = get_generator(PATCH_SIZE, LR_G)
     discriminator_d, discriminator_optimizer, ckpt_manager_d= get_discrimitor(PATCH_SIZE, 64, LR_D)
 
-    global epochs_plot, total_generator_g_error_plot
+    global epochs_plot, total_generator_g_error_plot, total_discriminator_d_error_plot
     epochs_plot = []
     total_generator_g_error_plot = []
     total_discriminator_d_error_plot = []
@@ -107,7 +109,8 @@ def training_loop(LR_G, LR_D, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EP
                     train_step_counter = 1
                     flag_only_D = False
                 else:
-                    print('Step for discriminator training:{}'.format(train_step_counter))
+                    if train_step_counter % 100 == 0:
+                        print('Step for discriminator training:{}'.format(train_step_counter))
 
             if flag_only_D == False:
                 if train_step_counter % 700 >= 500:
@@ -116,71 +119,78 @@ def training_loop(LR_G, LR_D, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EP
                     flag_G = False
                 else:
                     flag_G = True
-
-                print('Global Step:{}, is training on G?: {}'.format(train_step_counter, flag_G))
+                if train_step_counter % 100 == 0:
+                    print('Global Step:{}, is training on G?: {}'.format(train_step_counter, flag_G))
 
             r = np.random.randint(0, 2, 3)
             batch_data = get_batch_data(data_x, i, BATCH_SIZE, r[0], r[1], r[2])
             batch_label = get_batch_data(data_y, i, BATCH_SIZE, r[0], r[1], r[2])
 
             if flag_G:
-                generator_loss = train_step_d(batch_data, batch_label).numpy()
-                print('Generator Loss:{}'.format(generator_loss))
+                generator_loss = train_step_g(batch_data, batch_label)
+                if train_step_counter % 500 == 0:
+                    print('Generator Loss:{}'.format(generator_loss))
+                #total_generator_g_error_plot.append(generator_loss)
 
             else:
-                if train_step_counter == 1 and flag_only_D:
 
-                    g_output = generator_g(batch_data.numpy())
-                    d_real_output = np.array([2, 1])
-                else:
-                    g_output = generator_g(batch_data.numpy())
-                    d_real_output = discriminator_d.predict(batch_label.numpy())
+                # if train_step_counter == 1 and flag_only_D:
+                #     g_output = generator_g(batch_data)
+                #     d_real_output = np.array([2, 1])
+                # else:
+                #     g_output = generator_g(batch_data)
+                #     d_real_output = discriminator_d.predict(batch_label)
 
-                discriminator_loss= train_step_d(g_output, d_real_output).numpy()
-                print('Discriminator Loss:{}'.format(discriminator_loss))
-
-
-            epochs_plot.append(epoch)
-            total_generator_g_error_plot.append(generator_loss)
-            total_discriminator_d_error_plot.append(discriminator_loss)
-
-            comparison_image = 725
-            comparison_image_hr = hr_data[comparison_image]
-            comparison_image_lr = lr_data[comparison_image]
-
-            generate_images(generator_g, comparison_image_lr, comparison_image_hr, PATCH_SIZE, "epoch_"+str(epoch) ," Epoch: "+str(epoch) )
-
-            # epoch_e_log = "Finished epoch "+str(epoch)+" at "+time.ctime()\
-            #               +". G Loss = "+str(generator_loss)+"."+". D Loss = "+str(discriminator_loss)
-            epoch_e_log = "Finished epoch " + str(epoch) + " at " + time.ctime() + ". D Loss = " + str(discriminator_loss)
-            log(epoch_e_log)
-
-            epoch_seconds = time.time() - epoch_start
-            epoch_t_log = "Epoch took "+str(datetime.timedelta(seconds=epoch_seconds))
-            log(epoch_t_log)
-
-            if train_step_counter % 200 == 0 and flag_only_D == False:
-                save_generator(ckpt_manager_g, epoch)
-                save_discriminator(ckpt_manager_d, epoch)
-                print("\n----------Saved checkpoint for step {}-------------\n".format(train_step_counter))
-
-            hr_data, lr_data = shuffle(hr_data, lr_data)
-
-            # if train_step_counter % 301 == 0 and flag_only_D == False:
-            #     # export evaluating parameters for [32,:,:] in a current patch
-            #     score_patch(generator.predict(lr.numpy()), hr, 32)
-
-            # if train_step_counter % 701 == 0 and flag_only_D == False:
-            #     display.clear_output(wait=True)
+                discriminator_loss= train_step_d(batch_data, batch_label) # d_loss_fn(discriminator_d, g_output, batch_label, training=True)
+                if train_step_counter % 500 == 0:
+                    print('Discriminator Loss:{}'.format(discriminator_loss))
+                #total_discriminator_d_error_plot.append(discriminator_loss)
 
             if train_step_counter == 55000:
                 print('\n ----------------- Completed for 55k steps! --------------------------\n')
                 break
+
+
+        epochs_plot.append(epoch)
+        total_discriminator_d_error_plot.append(discriminator_loss)
+
+
+        comparison_image = 725
+        comparison_image_hr = hr_data[comparison_image]
+        comparison_image_lr = lr_data[comparison_image]
+
+        generate_images(generator_g, comparison_image_lr, comparison_image_hr, PATCH_SIZE, "epoch_"+str(epoch) ," Epoch: "+str(epoch) )
+
+        # epoch_e_log = "Finished epoch "+str(epoch)+" at "+time.ctime()\
+        #               +". G Loss = "+str(generator_loss)+"."+". D Loss = "+str(discriminator_loss)
+        epoch_e_log = "Finished epoch " + str(epoch) + " at " + time.ctime() + ". D Loss = " + str(discriminator_loss)
+        log(epoch_e_log)
+
+        epoch_seconds = time.time() - epoch_start
+        epoch_t_log = "Epoch took "+str(datetime.timedelta(seconds=epoch_seconds))
+        log(epoch_t_log)
+
+        if train_step_counter % 500 == 0 and flag_only_D == False:
+            save_generator(ckpt_manager_g, epoch)
+            save_discriminator(ckpt_manager_d, epoch)
+            print("\n----------Saved checkpoint for step {}-------------\n".format(train_step_counter))
+
+        if train_step_counter % 500 == 0 and flag_only_D:
+            save_discriminator(ckpt_manager_d, train_step_counter)
+            print("\n----------Saved checkpoint for step {}-------------\n".format(train_step_counter))
+
+        score_patch(generator_g(comparison_image_lr), comparison_image_hr, 32)
+        hr_data, lr_data = shuffle(hr_data, lr_data)
+
+
         if train_step_counter == 55000:
             break
 
+    if total_discriminator_d_error_plot:
+        plot_losses_d(epochs_plot, total_discriminator_d_error_plot)
+    if total_generator_g_error_plot:
+        plot_losses_g(epochs_plot, total_generator_g_error_plot)
 
-    plot_losses(epochs_plot, total_generator_g_error_plot)
     generate_images(generator_g, comparison_image_lr, comparison_image_hr, PATCH_SIZE, "z_final_plot")
     
     training_e_log = "Finished training at "+time.ctime()
@@ -274,7 +284,7 @@ def training_loop_g(LR_G, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EPOCH_
         hr_data, lr_data = shuffle(hr_data, lr_data)
 
 
-    plot_losses(epochs_plot, total_generator_g_error_plot)
+    plot_losses_g(epochs_plot, total_generator_g_error_plot)
     generate_images(generator_g, comparison_image_lr, comparison_image_hr, PATCH_SIZE, "z_final_plot")
 
     training_e_log = "Finished training at " + time.ctime()
@@ -283,3 +293,7 @@ def training_loop_g(LR_G, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EPOCH_
     training_seconds = time.time() - training_start
     training_t_log = "Training took " + str(datetime.timedelta(seconds=training_seconds))
     log(training_t_log)
+
+
+if __name__ == '__main__':
+    training_loop(1e-4, 1e-4, 1, 1, 10, 'l1_loss', 0)

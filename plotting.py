@@ -30,9 +30,16 @@ def generate_images(model, test_input, tar, PATCH_SIZE, figure_name, epoch="", r
     plt.savefig('generated_plots/'+figure_name+'.png', bbox_inches='tight')
 
 
-def plot_losses(epochs_plot, total_generator_g_error_plot):
+def plot_losses_g(epochs_plot, total_generator_g_error_plot):
     plt.figure(num=None, figsize=(20, 15), dpi=80, facecolor='w', edgecolor='k')
     plt.plot(epochs_plot, total_generator_g_error_plot, label ='Genreator G loss')
     plt.legend()
     # plt.show()
-    plt.savefig('generated_plots/losses_plot.png', bbox_inches='tight')
+    plt.savefig('generated_plots/g_losses_plot.png', bbox_inches='tight')
+
+def plot_losses_d(epochs_plot, total_discriminator_d_error_plot):
+    plt.figure(num=None, figsize=(20, 15), dpi=80, facecolor='w', edgecolor='k')
+    plt.plot(epochs_plot, total_discriminator_d_error_plot, label ='Discriminator D loss')
+    plt.legend()
+    # plt.show()
+    plt.savefig('generated_plots/d_losses_plot.png', bbox_inches='tight')

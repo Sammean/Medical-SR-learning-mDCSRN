@@ -1,6 +1,5 @@
 import tensorflow as tf
-from tensorflow import keras
-from keras import layers, Sequential
+from tensorflow.keras import layers, Sequential
 
 k = 16
 filter_size = 3
@@ -12,7 +11,7 @@ w_init = tf.keras.initializers.GlorotUniform()
 
 def dense_unit(no_of_filters=k, f_size=filter_size, training=True):
     unit = Sequential([
-        layers.BatchNormalization(training=training),
+        layers.BatchNormalization(),
         layers.ELU(),
         layers.Conv3D(no_of_filters, f_size, kernel_initializer=w_init, use_bias=utilize_bias,
                       padding='same', dtype=tf.float64)
@@ -50,7 +49,7 @@ def Generator(patch_size=64, training=True):
     concat = layers.Concatenate(dtype=tf.float64)([concat, dense3])
 
     reconstruction = layers.Conv3D(1, 1, padding='same', dtype=tf.float64)(concat)
-    return keras.Model(inputs=inputs, outputs=reconstruction)
+    return tf.keras.Model(inputs=inputs, outputs=reconstruction)
 
 
 
@@ -89,7 +88,7 @@ def Discriminator(patch_size=64, no_filters=64):
     logits = layers.Dense(1)(fc)
 
 
-    return keras.Model(inputs=inputs, outputs=logits)
+    return tf.keras.Model(inputs=inputs, outputs=logits)
 
 
 

@@ -24,7 +24,7 @@ def celoss_zeros(logits):
 
 def gradient_penalty(discriminator, sr, hr):
     batch_sz = hr.shape[0]
-    t = tf.random.uniform([batch_sz, 1, 1, 1], dtype=tf.float64)
+    t = tf.random.uniform([batch_sz, 1, 1, 1, 1], dtype=tf.float64)
     t = tf.broadcast_to(t, hr.shape)
     hr = tf.cast(hr, dtype=tf.float64)
     #print(t.dtype, hr.dtype)
@@ -48,7 +48,7 @@ def d_loss_fn(discriminator, sr, hr, training, lam=10.0):
     # 2. treat sr as fake
 
     d_fake_logits = discriminator(sr, training)
-    d_real_logits = discriminator(hr, training)
+    d_real_logits = discriminator(hr, training) # tf.cast(hr, dtype=tf.float64)
 
     d_fake_loss = celoss_zeros(d_fake_logits)
     d_real_loss = celoss_ones(d_real_logits)
