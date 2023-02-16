@@ -15,7 +15,7 @@ def training_parser():
                          default=1, type=int,
                          help='Batch Size. Default: "1"')
     parser.add_argument('-ep', '--epochs', action='store', default=50,
-                         type=int, help=('Epochs. Default: 1'))
+                         type=int, help=('Epochs. Default: 50'))
     parser.add_argument('-eps', '--epoch_start', action='store', default=0, 
                          type=int, help=('Starting Epoch. Default: 0'))
     parser.add_argument('-lt', '--loss_type', action='store', default='l1_loss',
