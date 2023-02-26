@@ -55,15 +55,15 @@ class DatafromCSV(object):
     def load_patchset(self, is_train=True):
         lr_raw_data, hr_raw_data = self.get_data()
         if is_train:
-            lr_dataset = tf.data.Dataset.from_tensor_slices(self.extract_patches(lr_raw_data, 64))
-            hr_dataset = tf.data.Dataset.from_tensor_slices(self.extract_patches(hr_raw_data, 64))
+            lr_dataset = tf.data.Dataset.from_tensor_slices(self.extract_patches(lr_raw_data, self.CUBE))
+            hr_dataset = tf.data.Dataset.from_tensor_slices(self.extract_patches(hr_raw_data, self.CUBE))
             dataset = tf.data.Dataset.zip((lr_dataset, hr_dataset))
         else:
             paddings = tf.constant([[0, 0], [40, 0], [34, 0], [34, 0]])
             lr_data = tf.pad(lr_raw_data, paddings, "CONSTANT")
             hr_data = tf.pad(hr_raw_data, paddings, "CONSTANT")
-            lr_dataset = tf.data.Dataset.from_tensor_slices(self.extract_patches(lr_data, 58))
-            hr_dataset = tf.data.Dataset.from_tensor_slices(self.extract_patches(hr_data, 58))
+            lr_dataset = tf.data.Dataset.from_tensor_slices(self.extract_patches(lr_data, self.CUBE-3))
+            hr_dataset = tf.data.Dataset.from_tensor_slices(self.extract_patches(hr_data, self.CUBE-3))
             dataset = tf.data.Dataset.zip((lr_dataset, hr_dataset))
         return dataset
 

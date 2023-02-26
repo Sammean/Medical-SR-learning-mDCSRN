@@ -39,21 +39,27 @@ def gradient_penalty(discriminator, sr, hr):
     grads = tf.reshape(grads, [grads.shape[0], -1])
     gp = tf.norm(grads, axis=1)  # [b]
     gp = tf.reduce_mean((gp - 1) ** 2)
-    gp = tf.cast(gp, dtype=tf.float32)
+    gp = tf.cast(gp, dtype=tf.float64)
     return gp
 
 
 def d_loss_fn(discriminator, sr, hr, training, lam=10.0):
     # 1. treat hr as real
     # 2. treat sr as fake
-
     d_fake_logits = discriminator(sr, training)
-    d_real_logits = discriminator(hr, training) # tf.cast(hr, dtype=tf.float64)
-
-    d_fake_loss = celoss_zeros(d_fake_logits)
-    d_real_loss = celoss_ones(d_real_logits)
-
-    gp = gradient_penalty(discriminator, sr, hr)
-    loss = d_real_loss + d_fake_loss + lam * gp
+    loss = 0
+    if training:
+        loss = celoss_zeros(d_fake_logits)
+    else:
+        d_real_logits = discriminator(hr, training)
+        d_fake_loss = celoss_zeros(d_fake_logits)
+        d_real_loss = celoss_ones(d_real_logits)
+    # gp = gradient_penalty(discriminator, sr, hr)
+        loss = d_real_loss + d_fake_loss # + lam * gp
     loss = tf.cast(loss, dtype=tf.float64)
     return loss
+
+
+def DLoss(y_pred, y_true):
+  d_loss =  tf.reduce_mean(y_pred) - tf.reduce_mean(y_true)
+  return d_loss
