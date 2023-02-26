@@ -1,6 +1,8 @@
 import tensorflow as tf
-from keras.constraints import Constraint
+from tensorflow.keras.constraints import Constraint
 from tensorflow.keras import layers, Sequential
+from tensorflow.keras import backend as K
+
 
 k = 16
 filter_size = 3
@@ -10,7 +12,7 @@ w_init = tf.keras.initializers.GlorotUniform()
 # w_init = tf.keras.initializers.HeUniform()
 
 
-def dense_unit(no_of_filters=k, f_size=filter_size, training=True):
+def dense_unit(no_of_filters=k, f_size=filter_size):
     unit = Sequential([
         layers.BatchNormalization(),
         layers.ELU(),
@@ -28,7 +30,7 @@ def dense_block(inputs, num_units=NUMBER_OF_UNITS_PER_BLOCK, training=True):
     return inputs
 
 
-def Generator(patch_size=[64,64,64], training=True):
+def Generator(patch_size=[64, 64, 64], training=True):
     patch_size.append(1)
     inputs = tf.keras.layers.Input(shape=patch_size, dtype=tf.float64)
     conv0 = layers.Conv3D(2 * k, filter_size, kernel_initializer=w_init, use_bias=utilize_bias,
@@ -57,12 +59,12 @@ def Generator(patch_size=[64,64,64], training=True):
 def conv_stride_block(no_of_filters):
     block = Sequential([
         layers.Conv3D(no_of_filters, 3, padding='same', strides=1,
-                      dtype=tf.float64, kernel_constraint = WeightClip(0.01)),
+                      dtype=tf.float64, kernel_constraint=WeightClip(0.01)),
         layers.LayerNormalization(),
         layers.LeakyReLU(),
 
         layers.Conv3D(no_of_filters, 3, padding='same', strides=2,
-                      dtype=tf.float64, kernel_constraint = WeightClip(0.01)),
+                      dtype=tf.float64, kernel_constraint=WeightClip(0.01)),
         layers.LayerNormalization(),
         layers.LeakyReLU()
     ])
@@ -84,16 +86,16 @@ class WeightClip(Constraint):
         return {'name': self.__class__.__name__,
                 'c': self.c}
 
-def Discriminator(patch_size=64, no_filters=64):
-
-    inputs = tf.keras.layers.Input(shape=(patch_size, patch_size, patch_size, 1), dtype=tf.float64)
+def Discriminator(patch_size=[64, 64, 64], no_filters=64):
+    patch_size.append(1)
+    inputs = tf.keras.layers.Input(shape=patch_size, dtype=tf.float64)
 
     conv1 = layers.Conv3D(no_filters, 3, strides=1, padding='same',
                           dtype=tf.float64, activation=layers.LeakyReLU(),
                           kernel_constraint=WeightClip(0.01))(inputs)
 
     conv2 = layers.Conv3D(no_filters, 3, strides=2, padding='same',
-                          dtype=tf.float64, kernel_constraint = WeightClip(0.01))(conv1)
+                          dtype=tf.float64, kernel_constraint=WeightClip(0.01))(conv1)
     lnorm = layers.LayerNormalization()(conv2)
     lrelu = layers.LeakyReLU()(lnorm)
 
@@ -101,10 +103,9 @@ def Discriminator(patch_size=64, no_filters=64):
     csb2_out = conv_stride_block(no_filters * 4)(csb1_out)
     csb3_out = conv_stride_block(no_filters * 8)(csb2_out)
 
-
     flatten = layers.Flatten()(csb3_out)
-    fc = layers.Dense(1024, activation=layers.LeakyReLU(), kernel_constraint = WeightClip(0.01))(flatten)
-    logits = layers.Dense(1, kernel_constraint = WeightClip(0.01))(fc)
+    fc = layers.Dense(1024, activation=layers.LeakyReLU(), kernel_constraint=WeightClip(0.01))(flatten)
+    logits = layers.Dense(1, kernel_constraint=WeightClip(0.01))(fc)
 
 
     return tf.keras.Model(inputs=inputs, outputs=logits, name='discriminator')

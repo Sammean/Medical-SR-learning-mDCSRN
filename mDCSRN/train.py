@@ -3,11 +3,10 @@ import time
 
 import tensorflow as tf
 import numpy as np
-from IPython import display
 
 from mDCSRN.dataset import load_idset, DatafromCSV
 from mDCSRN.model import Discriminator, Generator
-from mDCSRN.loss_functions import supervised_loss, d_loss_fn, DLoss, gradient_penalty
+from mDCSRN.loss_functions import supervised_loss, d_loss_fn, DLoss, g_gan_loss
 from mDCSRN.utils import score_patch
 from mDCSRN.logger import log
 
@@ -48,7 +47,6 @@ def pretrain_loop(csv_path, batch_size, patch_size, n_epochs, learning_rate):
     batch_counter = 0
     step_counter = 0
     g_loss_history = []
-    valid_loss_history = []
 
     for epoch in range(n_epochs):
         start = time.time()
@@ -57,7 +55,6 @@ def pretrain_loop(csv_path, batch_size, patch_size, n_epochs, learning_rate):
         iter = tf.compat.v1.data.make_one_shot_iterator(train_set)
         for el in iter:
             batch_counter += 1
-            display.clear_output(wait=True)
             indices = np.array(el)
             # ---------------------- Get data from id ----------------------
             Batchloader = DatafromCSV(indices)
@@ -101,13 +98,10 @@ def train_loop(csv_path, batch_size, patch_size, n_epochs):
 
     # -------------------------- Optimizer ----------------------- #
 
-    g_optimizer = tf.compat.v1.train.RMSPropOptimizer(0.0001)
-    d_optimizer = tf.compat.v1.train.RMSPropOptimizer(0.0001)
-    discriminator = Discriminator(patch_size=CUBE)
+    g_optimizer = tf.keras.optimizers.Adam(5e-6)
+    d_optimizer = tf.keras.optimizers.Adam(5e-6)
     generator = Generator(patch_size=CUBE)
-    discriminator.compile(loss=DLoss,
-                          optimizer=d_optimizer,
-                          metrics=['mse'])
+    discriminator = Discriminator(patch_size=CUBE)
 
     # -------------------------- Checkpoint ----------------------- #
     path = "./training_checkpoints"
@@ -158,7 +152,6 @@ def train_loop(csv_path, batch_size, patch_size, n_epochs):
         iter = tf.compat.v1.data.make_one_shot_iterator(train_set)
         for el in iter:
             batch_counter += 1
-            display.clear_output(wait=True)
             indices = np.array(el)
             # ---------------------- Get data from id ----------------------
             Batchloader = DatafromCSV(indices)
@@ -181,12 +174,12 @@ def train_loop(csv_path, batch_size, patch_size, n_epochs):
                 if flag_only_D == False:
                     if step_counter % 700 >= 500:
                         flag_G = False
-                    elif step_counter % 8 < 7:
+                    elif step_counter % 7 != 0:
                         flag_G = False
                     else:
                         flag_G = True
-
-                    print('Global Step:{}, Subject No.{}, is training on G?: {}'.format(step_counter,
+                    if step_counter % 201 == 0:
+                        print('Global Step:{}, Subject No.{}, is training on G?: {}'.format(step_counter,
                                                                                         batch_counter,
                                                                                         flag_G))
 
@@ -195,14 +188,12 @@ def train_loop(csv_path, batch_size, patch_size, n_epochs):
                     with tf.GradientTape() as g_tape:
 
                         g_output = generator(lr, training=True)
-                        #d_fake_output = discriminator(g_output.numpy())
                         g_vars = generator.variables
 
                         mae_loss = tf.losses.mean_absolute_error(hr, g_output)  # L1 Loss for Generator(Parts)
-                        #g_gan_loss = tf.cast(- 1e-3 * tf.reduce_mean(d_fake_output), dtype=tf.float64)
-                        gp = gradient_penalty(discriminator, g_output, hr)
-                        g_loss = tf.reduce_mean(mae_loss) + gp
-                        g_loss_history.append(g_loss)
+                        gan_loss = - 1e-3 * g_gan_loss(discriminator, g_output, hr)
+                        g_loss = tf.reduce_mean(mae_loss) + tf.cast(tf.reduce_mean(gan_loss), dtype=tf.float64)
+                        g_loss_history.append(g_loss.numpy())
 
                         with g_tape.stop_recording():
                             g_gradients = g_tape.gradient(g_loss, g_vars)  # generator.variables = g_vars
@@ -211,22 +202,23 @@ def train_loop(csv_path, batch_size, patch_size, n_epochs):
                 else:
                     with tf.GradientTape() as d_tape:
 
-                        if step_counter == 1 and flag_only_D:
-                            # temp = generator(tf.random.uniform([1, CUBE, CUBE, CUBE, 1]), itraining=False)
-                            g_output = generator(lr.numpy())
-                            d_real_output = np.zeros([2.0, 1.0])
-                        else:
-                            g_output = generator(lr.numpy())
-                            d_real_output = discriminator(hr.numpy())
-
+                        g_output = generator(lr.numpy())
                         d_loss = d_loss_fn(discriminator, g_output, hr, flag_only_D)
-                        #d_loss, _ = discriminator.train_on_batch(g_output, d_real_output, reset_metrics=False)
-                        d_loss_history.append(d_loss)
+                        d_loss_history.append(d_loss.numpy())
 
                         with d_tape.stop_recording():
                             d_gradients = d_tape.gradient(d_loss, discriminator.variables)
                             d_optimizer.apply_gradients(zip(d_gradients, discriminator.variables))
-                            print('Discriminator Loss:{}'.format(d_loss))
+                            print('Discriminator Loss:{}'.format(d_loss.numpy()))
+
+                    if flag_only_D and step_counter % 200 == 0:
+                        print('Discriminator Loss:{}'.format(d_loss.numpy()))
+                        f = open('d_loss.txt', 'a')
+                        for d in d_loss_history:
+                            f.write(str(d))
+                            f.write('\n')
+                        f.close()
+                        d_loss_history = []
 
                 if step_counter % 200 == 0 and flag_only_D == False:
 
@@ -253,9 +245,6 @@ def train_loop(csv_path, batch_size, patch_size, n_epochs):
                 if step_counter % 301 == 0 and flag_only_D == False:
                     # export evaluating parameters for [7,:,:] in a current patch
                     score_patch(generator(lr.numpy()), hr, 7, CUBE=CUBE)
-
-                if step_counter % 701 == 0 and flag_only_D == False:
-                    display.clear_output(wait=True)
 
                 if step_counter == 55000:
                     print('\n ----------------- Completed for 55k steps! --------------------------\n')

@@ -1,6 +1,6 @@
 /data/
 /generated_plots/
-.idea
+../.idea
 /__pycache__/
 /tensor_checkpoints_d/
 /tensor_checkpoints_g/

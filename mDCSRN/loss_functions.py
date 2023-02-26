@@ -43,23 +43,30 @@ def gradient_penalty(discriminator, sr, hr):
     return gp
 
 
-def d_loss_fn(discriminator, sr, hr, training, lam=10.0):
+def d_loss_fn(discriminator, sr, hr, training):    # , lam=10.0
     # 1. treat hr as real
     # 2. treat sr as fake
     d_fake_logits = discriminator(sr, training)
-    loss = 0
-    if training:
-        loss = celoss_zeros(d_fake_logits)
-    else:
-        d_real_logits = discriminator(hr, training)
-        d_fake_loss = celoss_zeros(d_fake_logits)
-        d_real_loss = celoss_ones(d_real_logits)
+    d_real_logits = discriminator(hr, training)
+    d_fake_loss = celoss_zeros(d_fake_logits)
+    d_real_loss = celoss_ones(d_real_logits)
     # gp = gradient_penalty(discriminator, sr, hr)
-        loss = d_real_loss + d_fake_loss # + lam * gp
+    loss = d_real_loss + d_fake_loss    # + lam * gp
     loss = tf.cast(loss, dtype=tf.float64)
     return loss
 
 
 def DLoss(y_pred, y_true):
-  d_loss =  tf.reduce_mean(y_pred) - tf.reduce_mean(y_true)
+  d_loss = tf.reduce_mean(y_pred) - tf.reduce_mean(y_true)
   return d_loss
+
+
+def g_gan_loss(discriminator, sr, hr):
+    batch_sz = hr.shape[0]
+    t = tf.random.uniform([batch_sz, 1, 1, 1, 1], dtype=tf.float64)
+    t = tf.broadcast_to(t, hr.shape)
+    hr = tf.cast(hr, dtype=tf.float64)
+    interplate = t * hr + (1 - t) * sr
+    d_interplate_logits = discriminator(interplate)
+
+    return d_interplate_logits
